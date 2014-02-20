@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Rebalancing Mystery</title>  <link rel=stylesheet href="./assets/css/ribbons.css"></link>
+<link rel=stylesheet href="http://yui.yahooapis.com/pure/0.4.2/pure-min.css"></link>
+<link rel=stylesheet href="http://purecss.io/combo/1.11.2?/css/main-grid.css&amp;/css/main.css&amp;/css/home.css&amp;/css/rainbow/baby-blue.css"></link>
+
+  
+  <link rel="stylesheet" href="libraries/highlighters/prettify/css/twitter-bootstrap.css" />
+</head>
+<body>
+   <!--[if lt IE 7]>
+     <p class="chromeframe">You are using an outdated browser. 
+       <a href="http://browsehappy.com/">Upgrade your browser today</a> or 
+       <a href="http://www.google.com/chromeframe/?redirect=true"> 
+         install Google Chrome Frame
+       </a> to better experience this site.
+    </p>
+   <![endif]-->
+   <!-- Ref: http://twitter.github.com/bootstrap/examples/hero.html -->
+  <div id = "layout">   
+    <div id = "main">
+      <div class="header">
+        <h1>Rebalancing Mystery</h1>
+        <h2>Still a Mystery But New Research Makes It a Little Clearer</h2>
+      </div>
+      <div class = "content">
+        
+<p>Throughout my career as a portfolio manager, I have been taught that rebalancing is good.  However, it seemed few understood why rebalancing is good or even explored if rebalancing is as universally positive as believed.  A research paper published last year is the first that led me down this path and resulted in some enlightenment.</p>
+
+<blockquote>
+Kiskiras, John and Nardon, Andrea<br>
+<strong>Portfolio Rebalancing: A Stable Source of Alpha</strong><br> <em>January 18, 2013</em><br>
+Available at SSRN: <a href="http://ssrn.com/abstract=2202736">http://ssrn.com/abstract=2202736</a>
+<br><br>
+<strong>Abstract: </strong>In this work we verify that portfolio rebalancing can generate an excess return under certain market conditions. In line with existing measures, developed specifically to capture that alpha (Rebalancing Bonus), we show that high volatility as well as low correlation maximize the magnitude of the excess return. However, in contrast to previous works, we demonstrate that the actual driver and therefore sufficient condition for a Rebalancing Bonus is the presence of relative mean-reversion.
+</blockquote>
+
+<pre><code class="r">#get very helpful Ken French data
+#for this project we will look at Industry Portfolios
+#http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/48_Industry_Portfolios_daily.zip
+
+require(PerformanceAnalytics)
+require(quantmod)
+require(xtsExtra)
+
+#my.url will be the location of the zip file with the data
+my.url=&quot;http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/48_Industry_Portfolios_daily.zip&quot;
+my.url=&quot;http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/10_Industry_Portfolios_daily.zip&quot;
+#this will be the temp file set up for the zip file
+my.tempfile&lt;-paste(tempdir(),&quot;\\frenchindustry.zip&quot;,sep=&quot;&quot;)
+#my.usefile is the name of the txt file with the data
+#my.usefile&lt;-paste(tempdir(),&quot;\\48_Industry_Portfolios_daily.txt&quot;,sep=&quot;&quot;)
+my.usefile&lt;-paste(tempdir(),&quot;\\10_Industry_Portfolios_daily.txt&quot;,sep=&quot;&quot;)
+download.file(my.url, my.tempfile, method=&quot;auto&quot;, 
+              quiet = FALSE, mode = &quot;wb&quot;,cacheOK = TRUE)
+unzip(my.tempfile,exdir=tempdir(),junkpath=TRUE)
+#read space delimited text file extracted from zip
+french_industry &lt;- read.table(file=my.usefile,
+                              header = TRUE, sep = &quot;&quot;,
+                              as.is = TRUE,
+                              skip = 9, nrows=22881)
+
+#get dates ready for xts index
+datestoformat &lt;- rownames(french_industry)
+datestoformat &lt;- paste(substr(datestoformat,1,4),
+                       substr(datestoformat,5,6),substr(datestoformat,7,8),sep=&quot;-&quot;)
+
+#get xts for analysis
+french_industry_xts &lt;- as.xts(french_industry[,1:NCOL(french_industry)],
+                              order.by=as.Date(datestoformat))
+
+#divide by 100 to get percent
+french_industry_xts &lt;- french_industry_xts/100
+
+#delete missing data which is denoted by -0.9999
+french_industry_xts[which(french_industry_xts &lt; -0.99,arr.ind=TRUE)[,1],
+                    unique(which(french_industry_xts &lt; -0.99,arr.ind=TRUE)[,2])] &lt;- 0
+
+
+
+
+
+data.monthly &lt;- french_industry_xts 
+
+#get cumulative of individual components as price
+data.monthly.cumul &lt;- data.frame(
+  lapply(
+    cumprod(1+data.monthly),
+    FUN=function(x){
+      x[endpoints(x,on=&quot;months&quot;),]
+    }
+  ))
+
+data.monthly.cumul &lt;- as.xts(data.monthly.cumul,orderBy=as.Date(index(data.monthly[endpoints(data.monthly,on=&quot;months&quot;),])))
+colnames(data.monthly.cumul) &lt;- colnames(data.monthly)
+
+
+#get the returns for a non rebalanced portfolio
+#starting point will be cumulative return for each by themselves
+#so just divide all the monthly values by the beginning value
+bh.cumul &lt;-
+  data.monthly.cumul /
+  matrix(
+    data.monthly.cumul[1,],
+    nrow=NROW(data.monthly.cumul),
+    ncol=NCOL(data.monthly.cumul),
+    byrow=TRUE
+  )
+#test our calculation graphically
+#should look exactly the same except scale
+#plot.zoo(merge(bh.cumul,data.monthly.cumul),nc=2)
+#now let&#39;s calculate cumulative at the portfolio level
+#multiple all by 1/N or 1/ncol
+#then sum by row
+portfolio &lt;- list()
+portfolio$bh &lt;- as.xts(
+  apply(
+    bh.cumul * 1/NCOL(bh.cumul),
+    MARGIN = 1,
+    FUN = sum
+  ),
+  orderBy = as.Date(index(bh.cumul))
+)
+#get the returns for a monthly rebalanced portfolio
+#since we are looking at monthly, we get monthly returns
+#then multiply each by 1/NCOL then sum returns by row
+#get monthly returns
+rebal.cumul &lt;- data.monthly.cumul/lag(data.monthly.cumul,k=1)-1
+#make first 0 instead of NA to start at 1
+rebal.cumul[1,] &lt;- 0
+portfolio$rebal &lt;- as.xts(
+  cumprod(apply(
+    rebal.cumul * 1/NCOL(rebal.cumul),
+    MARGIN = 1,
+    FUN = sum) + 1
+  ),
+  orderBy = as.Date(index(rebal.cumul))
+)
+
+#get all indexes in same format, same class, etc. so merge will be proper
+index(portfolio$bh) &lt;- index(portfolio$rebal) &lt;- index(data.monthly.cumul)
+
+
+xtsExtra::plot.xts(  
+  merge(
+    #data.monthly.cumul[,1],
+    portfolio$bh,
+    portfolio$rebal#,
+    #apply(data.monthly.cumul,MARGIN=1,FUN=max)-portfolio$rebal, #best component - rebal portfolio
+    #portfolio$rebal-portfolio$bh  #rebalancing bonus(Rb)
+  ),
+  screens=1,
+  #screens=c(rep(1,NCOL(data.monthly.cumul)),2,2,3,4),
+  #layout.screens=matrix(c(1,2,1,2,3,4),ncol=2,byrow=TRUE),
+  #ylim = matrix(c(-1,5,-1,5,-1,50,-15,15),ncol=2,byrow=TRUE),
+  auto.legend=TRUE,
+  main = &quot;Rebalancing Bonus (Nardon/Kiskiras)\nFrench Industry&quot;
+)
+
+
+data.monthly.cumul2 &lt;- merge(data.monthly.cumul$NoDur,data.monthly.cumul)
+data.monthly.cumul2
+
+outperform &lt;- xts()
+#test all combinations with 1st Agriculture for fun
+for (i in 2:NCOL(data.monthly.cumul2)){
+  temp &lt;- data.monthly.cumul2[,c(1,i)]
+  #get the returns for a non rebalanced portfolio
+  #starting point will be cumulative return for each by themselves
+  #so just divide all the monthly values by the beginning value
+  bh.cumul &lt;-
+    temp /
+    matrix(
+      temp[1,],
+      nrow=NROW(temp),
+      ncol=NCOL(temp),
+      byrow=TRUE
+    )
+  #test our calculation graphically
+  #should look exactly the same except scale
+  #plot.zoo(merge(bh.cumul,temp),nc=2)
+  #now let&#39;s calculate cumulative at the portfolio level
+  #multiple all by 1/N or 1/ncol
+  #then sum by row
+  portfolio &lt;- list()
+  portfolio$bh &lt;- as.xts(
+    apply(
+      bh.cumul * 1/NCOL(bh.cumul),
+      MARGIN = 1,
+      FUN = sum
+    ),
+    orderBy = as.Date(index(bh.cumul))
+  )
+  #get the returns for a monthly rebalanced portfolio
+  #since we are looking at monthly, we get monthly returns
+  #then multiply each by 1/NCOL then sum returns by row
+  #get monthly returns
+  rebal.cumul &lt;- temp/lag(temp,k=1)-1
+  #make first 0 instead of NA to start at 1
+  rebal.cumul[1,] &lt;- 0
+  portfolio$rebal &lt;- as.xts(
+    cumprod(apply(
+      rebal.cumul * 1/NCOL(rebal.cumul),
+      MARGIN = 1,
+      FUN = sum) + 1
+    ),
+    orderBy = as.Date(index(rebal.cumul))
+  )
+
+  #get all indexes in same format, same class, etc. so merge will be proper
+  index(portfolio$bh) &lt;- index(portfolio$rebal) &lt;- index(temp)
+  outperform &lt;- merge(outperform, portfolio$rebal-portfolio$bh)
+}
+colnames(outperform) &lt;- colnames(data.monthly.cumul2)[-1]
+
+t(tail(outperform,1))
+#hm &lt;- table.HigherMoments(french_industry_xts[,colnames(data.monthly.cumul2)],french_industry_xts[,colnames(data.monthly.cumul2)[1]])
+#corr &lt;- table.Correlation(french_industry_xts,french_industry_xts$Agric)[,1]
+#capm &lt;- table.CAPM(french_industry_xts[,colnames(data.monthly.cumul2)],french_industry_xts[,colnames(data.monthly.cumul2)[1]])
+
+
+statsTable &lt;- cbind(
+  t(tail(outperform[,-which(colnames(outperform)==&quot;NoDur.1&quot;)],1)),
+  (t(tail(data.monthly.cumul2,1)) - t(tail(data.monthly.cumul2,1))[1])[-c(1,which(colnames(data.monthly.cumul2)==&quot;NoDur.1&quot;)),],
+#  t(hm)[-1,],
+#  t(capm)[-1,]
+)[,-(3:4)]
+colnames(statsTable)[1:2] &lt;- c(&quot;PerfDiff&quot;,&quot;CumulLess&quot;)
+
+#get colors to use for heat map style coloring by out/under performance
+require(RColorBrewer)
+require(latticeExtra)
+dotplot(t(tail(outperform,1)))
+brew &lt;- brewer.pal(name=&quot;RdBu&quot;,n=5)
+#get color ramp
+cc.brew &lt;- colorRampPalette(brew)
+#apply color ramp
+cc &lt;- cc.brew(10)
+#do colors based on out/under performance but with gray so visible when labelling
+cc.palette &lt;- colorRampPalette(c(cc[1],&quot;gray60&quot;,cc[length(cc)]))
+cc.levpalette &lt;- cc.palette(10)
+cc.levels &lt;- level.colors(statsTable[,1], at = do.breaks(c(-max(abs(range(statsTable[,1]))),max(abs(range(statsTable[,1])))),10),
+                          col.regions = cc.levpalette)
+
+
+require(rCharts)
+p1 &lt;- rCharts$new()
+p1$setLib(system.file(&#39;parcoords&#39;, package = &#39;rCharts&#39;))
+p1$set(
+  padding = list(top = 24, left = 100, bottom = 12, right = 200),
+  height = &quot;600&quot;,
+  width = &quot;1000&quot;
+)
+#get range of data
+#for colors to be right need min and max to be same so 0 is center
+maxabs &lt;- max(abs(range(statsTable[,1])))
+p1$set(data = toJSONArray(statsTable, json = F), 
+       colorby = &#39;PerfDiff&#39;, 
+       range = c( -maxabs, 0, maxabs ),
+       colors = c( 
+         paste0( max( cc.levels) ),
+         &#39;gray&#39;,
+         paste0( min( cc.levels) )
+       )
+)
+p1
+
+
+#chart.RollingPerformance(ROC(data.monthly.cumul[,c(&quot;Aero&quot;,&quot;NoDur&quot;)],type=&quot;discrete&quot;,n=1),width=36)
+#chart.RollingPerformance(ROC(data.monthly.cumul[,c(&quot;Oil&quot;,&quot;NoDur&quot;)],type=&quot;discrete&quot;,n=1),width=36)
+xyplot(log(outperform[,rev(tail(order(t(tail(outperform,1))),20))]),scales=list(y=list(relation=&quot;same&quot;)))
+xyplot(outperform[,rev(head(order(t(tail(outperform,1))),20))],scales=list(y=list(relation=&quot;same&quot;)))
+</code></pre>
+
+      </div>        
+    </div>      
+  </div>
+</body>
+<!-- Load Javascripts for Widgets -->
+  
+  <!-- Google Prettify -->
+  <script src="http://cdnjs.cloudflare.com/ajax/libs/prettify/188.0.0/prettify.js"></script>
+  <script src='libraries/highlighters/prettify/js/lang-r.js'></script>
+  <script>
+    var pres = document.getElementsByTagName("pre");
+    for (var i=0; i < pres.length; ++i) {
+      pres[i].className = "prettyprint linenums";
+    }
+    prettyPrint();
+  </script>
+  <!-- End Google Prettify --> 
+  </html>
