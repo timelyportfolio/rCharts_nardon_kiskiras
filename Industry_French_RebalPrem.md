@@ -11,7 +11,7 @@ assets:
     - http://purecss.io/combo/1.11.2?/css/main-grid.css&/css/main.css&/css/home.css&/css/rainbow/baby-blue.css
 ---
 
-Throughout my career as a portfolio manager, I have been taught that rebalancing is good.  However, it seemed few understood why rebalancing is good or even explored if rebalancing is as universally positive as believed.  A research paper published last year is the first that led me down this path and resulted in some enlightenment.
+I have been taught that rebalancing is good.  However, it seemed few really understood the mystery of rebalancing or even explored if rebalancing is universally positive as believed.  The research that I read seemed to leave lots of unanswered questions, such as when does rebalancing work best and what combinations of investments produce the most rebalancing bonus or premium.  Last year John Kiskiras and Andrea Nardon published a paper that is easily the most enlightening that I have ever read.
 
 <blockquote>
 Kiskiras, John and Nardon, Andrea<br>
@@ -20,6 +20,28 @@ Available at SSRN: <a href="http://ssrn.com/abstract=2202736">http://ssrn.com/ab
 <br><br>
 <strong>Abstract: </strong>In this work we verify that portfolio rebalancing can generate an excess return under certain market conditions. In line with existing measures, developed specifically to capture that alpha (Rebalancing Bonus), we show that high volatility as well as low correlation maximize the magnitude of the excess return. However, in contrast to previous works, we demonstrate that the actual driver and therefore sufficient condition for a Rebalancing Bonus is the presence of relative mean-reversion.
 </blockquote>
+
+The authors utilize various simulations first to demonstrate some holes from previous research and then extend the simulations with Geometric Brownian Bridges (GBB) to conclude,
+
+<blockquote>
+"Based on these results we
+conclude that in order to generate a positive RB it is essential that the securities have relative
+mean-reversion characteristics, and the more persistent the mean-reversion is, the higher the RB (<small><em>Rebalancing Bonus</em></small>) will be."<br>
+</blockquote>
+
+and then with sequenced Geometric Brownian Bridges and varying allocation weights,
+
+<blockquote>
+We find that in the presence of mean-reversion, the equally-weighted allocation outperforms other combinations of fixed-weights allocation. Furthermore, the equally weighted allocation together with high volatilities and low correlations result to a maximum RB.
+</blockquote>
+
+The authors then apply these findings to real markets using 4 equally weighted MSCI Country Indexes (Chile, Indonesia, Malaysia and Mexico).  Their chart in Exhibit 11 best summarizes their results.
+
+<embed src="./assets/img/exhibit11.svg" type="image/svg+xml" />
+
+## Do It In R
+
+For the keen R user, you will notice this is a Matlab, not an R plot.  The authors kindly offered their Matlab code, but as a learning challenge I decided to try to do it on my own in R.
 
 
 ```r
