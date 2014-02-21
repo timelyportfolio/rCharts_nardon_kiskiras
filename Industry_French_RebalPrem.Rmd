@@ -9,8 +9,10 @@ assets:
   css:
     - http://yui.yahooapis.com/pure/0.4.2/pure-min.css
     - http://purecss.io/combo/1.11.2?/css/main-grid.css&/css/main.css&/css/home.css&/css/rainbow/baby-blue.css
+    - ./assets/css/local.css
 ---
 
+<h2 class="content-subhead">Introduction</h2>
 I have always been taught that rebalancing is good.  However, it seemed few really understood the mystery of rebalancing or even explored if rebalancing is universally positive as believed.  The research that I read seemed to leave lots of unanswered questions, such as when does rebalancing work best and what combinations of investments produce the most rebalancing bonus or premium.  Last year John Kiskiras and Andrea Nardon published a paper that is easily the most enlightening that I have ever read.
 
 <blockquote>
@@ -39,7 +41,7 @@ The authors then apply these findings to real markets using 4 equally weighted M
 
 <embed src="./assets/img/exhibit11.svg" type="image/svg+xml" />
 
-## Do It In R
+<h2 class="content-subhead">Do It In R</h2>
 
 For the avid R user, you will notice this is a Matlab, not an R plot.  The authors kindly offered their Matlab code, but as a learning challenge I decided to try to do it on my own in R.  
 
