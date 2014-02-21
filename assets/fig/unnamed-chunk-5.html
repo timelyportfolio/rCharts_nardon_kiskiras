@@ -197,7 +197,11 @@ var color = function(d) { return getColors(d[params.colorby]); };
     
       <script>
         d3.selectAll("svg").selectAll("text")
-          .style("font-size","10px")
+          .style("font-size","10px");
+          
+        d3.selectAll(".axis > text")
+          .attr("transform", "rotate(-13) translate(-3,-3)")
+          .style("text-anchor", "start")
       </script>
           
   </body>
