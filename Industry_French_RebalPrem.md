@@ -44,7 +44,7 @@ The authors then apply these findings to real markets using 4 equally weighted M
 
 <h2 class="content-subhead">Do It In R</h2>
 
-For the avid R user, you will notice this is a Matlab, not an R plot.  The authors kindly offered their Matlab code, but as a learning challenge I decided to try to do it on my own in R.  
+For the avid R user, you will notice this is a Matlab, not an R plot.  The authors kindly offered their Matlab code, but as a learning challenge I decided to try to do it on my own in R.  Once I had some R code, I could extend their research to other combinations of investments, and of course, explore it interactively with [rCharts](http://rcharts.io).
 
 
 ```r
