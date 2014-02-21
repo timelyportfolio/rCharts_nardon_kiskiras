@@ -1,6 +1,6 @@
 ---
-title: Rebalancing Mystery
-lead: Still a Mystery But New Research Makes It a Little Clearer
+title: Mystery of Rebalancing
+lead: Still Unsolved But New Research Makes It a Little Clearer
 framework: pure
 mode     : selfcontained # {standalone, draft}
 highlighter: prettify
@@ -9,7 +9,8 @@ assets:
   css:
     - http://yui.yahooapis.com/pure/0.4.2/pure-min.css
     - http://purecss.io/combo/1.11.2?/css/main-grid.css&/css/main.css&/css/home.css&/css/rainbow/baby-blue.css
-    - ./assets/css/local.css
+    - http://fonts.googleapis.com/css?family=Roboto:300,400
+    - http://fonts.googleapis.com/css?family=Oxygen:300
 ---
 
 <h2 class="content-subhead">Introduction</h2>
