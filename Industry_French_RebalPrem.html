@@ -55,152 +55,120 @@ We find that in the presence of mean-reversion, the equally-weighted allocation 
 
 <p>For the avid R user, you will notice this is a Matlab, not an R plot.  The authors kindly offered their Matlab code, but as a learning challenge I decided to try to do it on my own in R.  Once I had some R code, I could extend their research to other combinations of investments, and of course, explore it interactively with <a href="http://rcharts.io">rCharts</a>.</p>
 
+<h4>Rebalancing Premium with French Industry Dataset</h4>
+
+<p>I have professed <a href="http://timelyportfolio.blogspot.com/search/label/french">my love in multiple posts</a> for the <a href="http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">Kenneth French Dataset</a>.  Let&#39;s use it again to see what combination of industries offers the most historical rebalancing premium.</p>
+
+<p>We will start by getting the data.</p>
+
 <pre><code class="r">#get very helpful Ken French data
 #for this project we will look at Industry Portfolios
-#http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/48_Industry_Portfolios_daily.zip
 
 require(PerformanceAnalytics)
 require(quantmod)
 require(xtsExtra)
 
 #my.url will be the location of the zip file with the data
-my.url=&quot;http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/48_Industry_Portfolios_daily.zip&quot;
-my.url=&quot;http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/10_Industry_Portfolios_daily.zip&quot;
+my.url=
+  &quot;http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp&quot;
+industries = 10 #change to 12,17,30,38,48 if want more industries
+my.file = paste0(
+  &quot;/&quot;,
+  industries,
+  &quot;_Industry_Portfolios_daily.zip&quot;
+)
 #this will be the temp file set up for the zip file
-my.tempfile&lt;-paste(tempdir(),&quot;\\frenchindustry.zip&quot;,sep=&quot;&quot;)
+my.tempfile &lt;- paste(tempdir(),&quot;\\frenchindustry.zip&quot;,sep=&quot;&quot;)
 #my.usefile is the name of the txt file with the data
-#my.usefile&lt;-paste(tempdir(),&quot;\\48_Industry_Portfolios_daily.txt&quot;,sep=&quot;&quot;)
-my.usefile&lt;-paste(tempdir(),&quot;\\10_Industry_Portfolios_daily.txt&quot;,sep=&quot;&quot;)
-download.file(my.url, my.tempfile, method=&quot;auto&quot;, 
-              quiet = FALSE, mode = &quot;wb&quot;,cacheOK = TRUE)
+my.usefile &lt;-  paste(
+  tempdir(),
+  paste0(&quot;\\&quot;,industries,&quot;_Industry_Portfolios_daily.txt&quot;),
+  sep=&quot;&quot;
+)
+download.file(
+  paste0(my.url,my.file),
+  my.tempfile, method=&quot;auto&quot;, 
+  quiet = FALSE, mode = &quot;wb&quot;,cacheOK = TRUE
+)
 unzip(my.tempfile,exdir=tempdir(),junkpath=TRUE)
+
 #read space delimited text file extracted from zip
-french_industry &lt;- read.table(file=my.usefile,
-                              header = TRUE, sep = &quot;&quot;,
-                              as.is = TRUE,
-                              skip = 9, nrows=22881)
+french_industry &lt;- read.table(
+  file=my.usefile,
+  header = TRUE, sep = &quot;&quot;,
+  as.is = TRUE,
+  skip = 9, nrows=22881
+)
 
 #get dates ready for xts index
 datestoformat &lt;- rownames(french_industry)
-datestoformat &lt;- paste(substr(datestoformat,1,4),
-                       substr(datestoformat,5,6),substr(datestoformat,7,8),sep=&quot;-&quot;)
+datestoformat &lt;- paste(
+  substr(datestoformat,1,4),
+  substr(datestoformat,5,6),
+  substr(datestoformat,7,8),
+  sep=&quot;-&quot;
+)
 
 #get xts for analysis
-french_industry_xts &lt;- as.xts(french_industry[,1:NCOL(french_industry)],
-                              order.by=as.Date(datestoformat))
+french_industry_xts &lt;- as.xts(
+  french_industry[,1:NCOL(french_industry)],
+  order.by=as.Date(datestoformat)
+)
 
 #divide by 100 to get percent
 french_industry_xts &lt;- french_industry_xts/100
 
 #delete missing data which is denoted by -0.9999
-french_industry_xts[which(french_industry_xts &lt; -0.99,arr.ind=TRUE)[,1],
-                    unique(which(french_industry_xts &lt; -0.99,arr.ind=TRUE)[,2])] &lt;- 0
+french_industry_xts[
+  which(french_industry_xts &lt; -0.99,arr.ind=TRUE)[,1],
+  unique(
+    which(french_industry_xts &lt; -0.99,arr.ind=TRUE)[,2])
+] &lt;- 0
+</code></pre>
 
+<p>Once we have the data, let&#39;s set it up for rebalancing.  Rebalancing can occur on any periodic basis.  For this example I will choose rebalancing monthly with no trading costs.  To evaluate other periods, change <code>on=&quot;months&quot;</code> to <code>&quot;days&quot;, &quot;weeks&quot;, &quot;months&quot;, &quot;quarters&quot;, and &quot;years&quot;</code>.</p>
 
-
-
-
-data.monthly &lt;- french_industry_xts 
-
+<pre><code class="r">#make a function
 #get cumulative of individual components as price
-data.monthly.cumul &lt;- data.frame(
-  lapply(
-    cumprod(1+data.monthly),
-    FUN=function(x){
-      x[endpoints(x,on=&quot;months&quot;),]
-    }
-  ))
-
-data.monthly.cumul &lt;- as.xts(data.monthly.cumul,orderBy=as.Date(index(data.monthly[endpoints(data.monthly,on=&quot;months&quot;),])))
-colnames(data.monthly.cumul) &lt;- colnames(data.monthly)
-
-
-#get the returns for a non rebalanced portfolio
-#starting point will be cumulative return for each by themselves
-#so just divide all the monthly values by the beginning value
-bh.cumul &lt;-
-  data.monthly.cumul /
-  matrix(
-    data.monthly.cumul[1,],
-    nrow=NROW(data.monthly.cumul),
-    ncol=NCOL(data.monthly.cumul),
-    byrow=TRUE
+#endpoints will determine periodic rebalancing
+#so if you want something other than monthly
+calcrebal &lt;- function(data, rebal.period = &quot;months&quot;) {
+  data.cumul &lt;- data.frame(
+    lapply(
+      cumprod(1+data),
+      FUN=function(x){
+        x[endpoints(x,on=rebal.period),]
+      }
+    )
   )
-#test our calculation graphically
-#should look exactly the same except scale
-#plot.zoo(merge(bh.cumul,data.monthly.cumul),nc=2)
-#now let&#39;s calculate cumulative at the portfolio level
-#multiple all by 1/N or 1/ncol
-#then sum by row
-portfolio &lt;- list()
-portfolio$bh &lt;- as.xts(
-  apply(
-    bh.cumul * 1/NCOL(bh.cumul),
-    MARGIN = 1,
-    FUN = sum
-  ),
-  orderBy = as.Date(index(bh.cumul))
-)
-#get the returns for a monthly rebalanced portfolio
-#since we are looking at monthly, we get monthly returns
-#then multiply each by 1/NCOL then sum returns by row
-#get monthly returns
-rebal.cumul &lt;- data.monthly.cumul/lag(data.monthly.cumul,k=1)-1
-#make first 0 instead of NA to start at 1
-rebal.cumul[1,] &lt;- 0
-portfolio$rebal &lt;- as.xts(
-  cumprod(apply(
-    rebal.cumul * 1/NCOL(rebal.cumul),
-    MARGIN = 1,
-    FUN = sum) + 1
-  ),
-  orderBy = as.Date(index(rebal.cumul))
-)
 
-#get all indexes in same format, same class, etc. so merge will be proper
-index(portfolio$bh) &lt;- index(portfolio$rebal) &lt;- index(data.monthly.cumul)
+  data.cumul &lt;- as.xts(
+    data.cumul,
+    orderBy=as.Date(
+      index(
+        data[endpoints(data,on=rebal.period),]
+      )
+    )
+  )
+  colnames(data.cumul) &lt;- colnames(data)
 
 
-xtsExtra::plot.xts(  
-  merge(
-    #data.monthly.cumul[,1],
-    portfolio$bh,
-    portfolio$rebal#,
-    #apply(data.monthly.cumul,MARGIN=1,FUN=max)-portfolio$rebal, #best component - rebal portfolio
-    #portfolio$rebal-portfolio$bh  #rebalancing bonus(Rb)
-  ),
-  screens=1,
-  #screens=c(rep(1,NCOL(data.monthly.cumul)),2,2,3,4),
-  #layout.screens=matrix(c(1,2,1,2,3,4),ncol=2,byrow=TRUE),
-  #ylim = matrix(c(-1,5,-1,5,-1,50,-15,15),ncol=2,byrow=TRUE),
-  auto.legend=TRUE,
-  main = &quot;Rebalancing Bonus (Nardon/Kiskiras)\nFrench Industry&quot;
-)
-
-
-data.monthly.cumul2 &lt;- merge(data.monthly.cumul$NoDur,data.monthly.cumul)
-data.monthly.cumul2
-
-outperform &lt;- xts()
-#test all combinations with 1st Agriculture for fun
-for (i in 2:NCOL(data.monthly.cumul2)){
-  temp &lt;- data.monthly.cumul2[,c(1,i)]
   #get the returns for a non rebalanced portfolio
   #starting point will be cumulative return for each by themselves
   #so just divide all the monthly values by the beginning value
   bh.cumul &lt;-
-    temp /
+    data.cumul /
     matrix(
-      temp[1,],
-      nrow=NROW(temp),
-      ncol=NCOL(temp),
+      data.cumul[1,],
+      nrow=NROW(data.cumul),
+      ncol=NCOL(data.cumul),
       byrow=TRUE
     )
   #test our calculation graphically
   #should look exactly the same except scale
-  #plot.zoo(merge(bh.cumul,temp),nc=2)
+  #plot.zoo(merge(bh.cumul,data.cumul),nc=2)
   #now let&#39;s calculate cumulative at the portfolio level
-  #multiple all by 1/N or 1/ncol
+  #multiple all by 1/N or 1/ncol for equal-weighting
   #then sum by row
   portfolio &lt;- list()
   portfolio$bh &lt;- as.xts(
@@ -215,7 +183,8 @@ for (i in 2:NCOL(data.monthly.cumul2)){
   #since we are looking at monthly, we get monthly returns
   #then multiply each by 1/NCOL then sum returns by row
   #get monthly returns
-  rebal.cumul &lt;- temp/lag(temp,k=1)-1
+  rebal.cumul &lt;- data.cumul/
+    lag(data.cumul,k=1)-1
   #make first 0 instead of NA to start at 1
   rebal.cumul[1,] &lt;- 0
   portfolio$rebal &lt;- as.xts(
@@ -227,70 +196,195 @@ for (i in 2:NCOL(data.monthly.cumul2)){
     orderBy = as.Date(index(rebal.cumul))
   )
 
-  #get all indexes in same format, same class, etc. so merge will be proper
-  index(portfolio$bh) &lt;- index(portfolio$rebal) &lt;- index(temp)
-  outperform &lt;- merge(outperform, portfolio$rebal-portfolio$bh)
+  #get all indexes in same format,
+  #same class, etc. so merge will be proper
+  index(portfolio$bh) &lt;- 
+    index(portfolio$rebal) &lt;- 
+    index(data.cumul)
+
+  return (list(data=data.cumul,portfolio=portfolio))
 }
-colnames(outperform) &lt;- colnames(data.monthly.cumul2)[-1]
 
-t(tail(outperform,1))
-#hm &lt;- table.HigherMoments(french_industry_xts[,colnames(data.monthly.cumul2)],french_industry_xts[,colnames(data.monthly.cumul2)[1]])
-#corr &lt;- table.Correlation(french_industry_xts,french_industry_xts$Agric)[,1]
-#capm &lt;- table.CAPM(french_industry_xts[,colnames(data.monthly.cumul2)],french_industry_xts[,colnames(data.monthly.cumul2)[1]])
+#use our function with our french_industry_data
+french_rebal &lt;- calcrebal(french_industry_xts,&quot;months&quot;)
 
+plotdata &lt;- merge(
+  log(french_rebal$data),
+  log(french_rebal$portfolio$bh),
+  log(french_rebal$portfolio$rebal),
+   #best component - rebal portfolio
+  apply(
+    french_rebal$data,
+    MARGIN=1,FUN=max
+  )-french_rebal$portfolio$rebal,
+  #rebalancing bonus(Rb)
+  french_rebal$portfolio$rebal-french_rebal$portfolio$bh
+)
+colnames(plotdata) &lt;- c(
+  colnames(french_rebal$data),
+  &quot;buyhold&quot;,
+  &quot;rebal&quot;,
+  &quot;bestminusrebal&quot;,
+  &quot;rebalbonus&quot;
+)
+
+xtsExtra::plot.xts(  
+  plotdata,
+  #screens=1,
+  screens=c(rep(1,NCOL(data.cumul)),2,2,3,4),
+  layout.screens=matrix(c(1,2,1,2,3,4),ncol=2,byrow=TRUE),
+  ylim = matrix(
+    c(
+      -1,10,
+      -1,10,
+      -1,10000,
+      -1,10000),ncol=2,byrow=TRUE),
+  auto.legend=TRUE,
+  main = &quot;Rebalancing Bonus (Nardon/Kiskiras)\nFrench Industry&quot;
+)
+</code></pre>
+
+<p><img src="assets/fig/unnamed-chunk-3.png" alt="plot of chunk unnamed-chunk-3"> </p>
+
+<h4>Best Combinations and Why</h4>
+
+<p>With some <a href="http://syntagmatic.github.io/parallel-coordinates/">d3 parallel coordinates</a> accessed through rCharts, we can try to determine which combinations work best.  Then take it one step further to see if any performance statistics help determine why.</p>
+
+<pre><code class="r">outperform &lt;- xts()
+#test all combinations with 1st NoDur for fun
+for (i in 2:NCOL(french_industry_xts)){
+  temp &lt;- french_industry_xts[,c(1,i)]
+  temprebal &lt;- calcrebal(temp,&quot;months&quot;)
+  outperform &lt;- merge(
+    outperform,
+    temprebal$portfolio$rebal-temprebal$portfolio$bh
+  )
+}
+colnames(outperform) &lt;- colnames(french_industry_xts)[-1]
+
+
+# a simple lattice plot for examination of combinations
+require(latticeExtra)
+asTheEconomist(
+  xyplot(
+    outperform[,rev(
+      head(order(t(tail(outperform,1))),20))
+    ],
+    scales=list(y=list(relation=&quot;same&quot;)),
+    main = &quot;French Industry Combinations with NonDur&quot;
+  )
+)
+</code></pre>
+
+<p><img src="assets/fig/unnamed-chunk-4.png" alt="plot of chunk unnamed-chunk-4"> </p>
+
+<pre><code class="r">#dotplot(t(tail(outperform,1)))
+</code></pre>
+
+<p>Now we are finally at my favorite part - interactive exploration.</p>
+
+<pre><code class="r">#t(tail(outperform,1))
+
+hm &lt;- table.HigherMoments(
+  ROC(
+    french_rebal$data[,-1],
+    n = 1, type = &quot;discrete&quot;
+  ),
+  ROC(
+    french_rebal$data[,1],
+    n = 1, type = &quot;discrete&quot;
+  )
+)
+correl &lt;- table.Correlation(
+  ROC(
+    french_rebal$data[,-1],
+    n = 1, type = &quot;discrete&quot;
+  ),
+  ROC(
+    french_rebal$data[,1],
+    n = 1, type = &quot;discrete&quot;
+  )
+)
+capm &lt;- table.CAPM(
+  ROC(
+    french_rebal$data[,-1],
+    n = 1, type = &quot;discrete&quot;
+  ),
+  ROC(
+    french_rebal$data[,1],
+    n = 1, type = &quot;discrete&quot;
+  )
+)
 
 statsTable &lt;- cbind(
-  t(tail(outperform[,-which(colnames(outperform)==&quot;NoDur.1&quot;)],1)),
-  (t(tail(data.monthly.cumul2,1)) - t(tail(data.monthly.cumul2,1))[1])[-c(1,which(colnames(data.monthly.cumul2)==&quot;NoDur.1&quot;)),],
-#  t(hm)[-1,],
-#  t(capm)[-1,]
-)[,-(3:4)]
+  (t(tail(outperform,1))),
+  (t(tail(french_rebal$data,1))[-1,] - 
+     t(tail(french_rebal$data,1))[1]),
+  t(hm),
+  t(capm)
+)[,-c(3:4,9,12,13,15)]
 colnames(statsTable)[1:2] &lt;- c(&quot;PerfDiff&quot;,&quot;CumulLess&quot;)
 
-#get colors to use for heat map style coloring by out/under performance
+#get colors to use for heat map
+#style coloring by out/under performance
 require(RColorBrewer)
-require(latticeExtra)
-dotplot(t(tail(outperform,1)))
-brew &lt;- brewer.pal(name=&quot;RdBu&quot;,n=5)
-#get color ramp
-cc.brew &lt;- colorRampPalette(brew)
-#apply color ramp
-cc &lt;- cc.brew(10)
-#do colors based on out/under performance but with gray so visible when labelling
-cc.palette &lt;- colorRampPalette(c(cc[1],&quot;gray60&quot;,cc[length(cc)]))
-cc.levpalette &lt;- cc.palette(10)
-cc.levels &lt;- level.colors(statsTable[,1], at = do.breaks(c(-max(abs(range(statsTable[,1]))),max(abs(range(statsTable[,1])))),10),
-                          col.regions = cc.levpalette)
-
-
 require(rCharts)
+
+brew &lt;- brewer.pal(name=&quot;RdBu&quot;,n=5)
+
 p1 &lt;- rCharts$new()
 p1$setLib(system.file(&#39;parcoords&#39;, package = &#39;rCharts&#39;))
 p1$set(
-  padding = list(top = 24, left = 100, bottom = 12, right = 200),
-  height = &quot;600&quot;,
-  width = &quot;1000&quot;
+ padding = list(top = 24, left = 100, bottom = 12, right = 100),
+ height = &quot;400&quot;,
+ width = &quot;800&quot;
 )
 #get range of data
 #for colors to be right need min and max to be same so 0 is center
 maxabs &lt;- max(abs(range(statsTable[,1])))
-p1$set(data = toJSONArray(statsTable, json = F), 
-       colorby = &#39;PerfDiff&#39;, 
-       range = c( -maxabs, 0, maxabs ),
-       colors = c( 
-         paste0( max( cc.levels) ),
-         &#39;gray&#39;,
-         paste0( min( cc.levels) )
-       )
+p1$set(data = toJSONArray(statsTable, json = F),
+ colorby = &#39;PerfDiff&#39;,
+ range = c( -maxabs, 0, maxabs/2 ),
+ colors = c(
+  paste0( brew[1] ), #cc.levels
+  &#39;gray&#39;,
+  paste0( brew[5] )  #cc.levels
+ )
+)
+p1$setTemplate(
+  afterScript = &#39;
+  &lt;script&gt;
+    d3.selectAll(&quot;svg&quot;).selectAll(&quot;text&quot;)
+      .style(&quot;font-size&quot;,&quot;10px&quot;)
+  &lt;/script&gt;
+  &#39;
 )
 p1
-
-
-#chart.RollingPerformance(ROC(data.monthly.cumul[,c(&quot;Aero&quot;,&quot;NoDur&quot;)],type=&quot;discrete&quot;,n=1),width=36)
-#chart.RollingPerformance(ROC(data.monthly.cumul[,c(&quot;Oil&quot;,&quot;NoDur&quot;)],type=&quot;discrete&quot;,n=1),width=36)
-xyplot(log(outperform[,rev(tail(order(t(tail(outperform,1))),20))]),scales=list(y=list(relation=&quot;same&quot;)))
-xyplot(outperform[,rev(head(order(t(tail(outperform,1))),20))],scales=list(y=list(relation=&quot;same&quot;)))
 </code></pre>
+
+<iframe src='
+assets/fig/unnamed-chunk-5.html
+' scrolling='no' seamless
+class='rChart C:/Program Files/R/R-3.0.2/library/rCharts/parcoords '
+id=iframe-
+chart258454671568
+></iframe>
+
+<style>iframe.rChart{ width: 100%; height: 400px;}</style>
+
+<h2 class="content-subhead">Unfinished With No Conclusion</h2>
+
+<p>As you can probably tell this is just a start on what I consider very significant research.  I hope to explore this further, and I will happily share what I find.  Please let me know what you discover.</p>
+
+<h2 class = "content-subhead">Thanks</h2>
+
+<ul>
+<li><a href="http://github.com/ramnathv">Ramnath Vaidyanathan</a></li>
+<li><a href="https://twitter.com/syntagmatic">Kai Chang</a> for <a href="http://syntagmatic.github.io/parallel-coordinates/">parallel coordinates</a></li>
+<li><a href="http://bost.ocks.org/mike/">Mike Bostock</a> for <a href="http://d3js.org">d3.js</a> and all the examples</li>
+<li><a href="http://ssrn.com/abstract=2202736">John Kiskiras and Andrea Nardon</a> for the research</li>
+<li><a href="http://yahoo.com">Yahoo</a> for their framework <a href="htpp://purecss.io">Pure</a></li>
+</ul>
 
       </div>        
     </div>      

@@ -5,3 +5,7 @@
 body, p {
   font-family: "Oxygen", sans-serif;
 }
+
+svg text {
+  font-size:10px;
+}
